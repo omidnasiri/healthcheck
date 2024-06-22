@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	http.HandleFunc("/alpha", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/beta", func(w http.ResponseWriter, r *http.Request) {
 		chance := rand.Intn(100)
 		if chance < 90 {
 			w.WriteHeader(http.StatusOK)
@@ -17,8 +17,8 @@ func main() {
 		}
 	})
 
-	log.Println("alpha server listening on port 8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	log.Println("beta server listening on port 8080")
+	if err := http.ListenAndServe(":8081", nil); err != nil {
 		log.Fatalln(err)
 	}
 }
