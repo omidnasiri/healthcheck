@@ -48,8 +48,8 @@ func main() {
 	wg.Add(1)
 	go Agent(ctx, &wg, alpha)
 
-	wg.Add(1)
-	go Agent(ctx, &wg, beta)
+	// wg.Add(1)
+	// go Agent(ctx, &wg, beta)
 
 	time.Sleep(5 * time.Minute)
 }
@@ -98,6 +98,7 @@ func HealthCheck(url string) error {
 
 func Agent(ctx context.Context, wg *sync.WaitGroup, endpoint *Endpoint) {
 	defer wg.Done()
+	tries := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -105,9 +106,15 @@ func Agent(ctx context.Context, wg *sync.WaitGroup, endpoint *Endpoint) {
 		case <-time.After(time.Duration(endpoint.Interval) * time.Second):
 			err := HealthCheck(endpoint.URL)
 			if err != nil {
-				log.Println(endpoint.URL, "healthcheck failed, err:", err.Error())
+				tries++
+				log.Println(endpoint.URL, "healthcheck failed, try ", tries, ", err:", err.Error())
+				if tries >= endpoint.Retries {
+					log.Println(endpoint.URL, "endpoint is unhealthy")
+					return
+				}
 				continue
 			}
+			tries = 0
 			log.Println(endpoint.URL, "endpoint is healthy")
 		}
 	}

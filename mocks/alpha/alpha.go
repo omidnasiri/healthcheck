@@ -11,7 +11,7 @@ func main() {
 	http.HandleFunc("/alpha", func(w http.ResponseWriter, r *http.Request) {
 		chance := rand.Intn(100)
 		var status int
-		if chance < 90 {
+		if chance > 50 {
 			status = http.StatusOK
 		} else {
 			status = http.StatusInternalServerError
