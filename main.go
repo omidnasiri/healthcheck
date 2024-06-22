@@ -27,20 +27,6 @@ type Endpoint struct {
 
 const WebhookURL = "http://localhost:9000/webhook"
 
-var (
-	alpha = &Endpoint{
-		URL:      "http://localhost:8080/alpha",
-		Interval: 5,
-		Retries:  3,
-	}
-
-	beta = &Endpoint{
-		URL:      "http://localhost:8081/beta",
-		Interval: 5,
-		Retries:  3,
-	}
-)
-
 func main() {
 	db, err := PostgresConn()
 	if err != nil {
@@ -54,14 +40,22 @@ func main() {
 	endpointRoutes := router.Group("/endpoints")
 	{
 		endpointRoutes.POST("", func(c *gin.Context) {
-			var endpoint Endpoint
-			err := c.BindJSON(&endpoint)
+			req := struct {
+				URL      string `json:"url" binding:"required"`
+				Interval int    `json:"interval" binding:"required"`
+				Retries  int    `json:"retries" binding:"required"`
+			}{}
+			err := c.ShouldBindJSON(&req)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
 
-			err = db.Create(endpoint).Error
+			err = db.Create(&Endpoint{
+				URL:      req.URL,
+				Interval: req.Interval,
+				Retries:  req.Retries,
+			}).Error
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -84,9 +78,9 @@ func main() {
 		endpointRoutes.PATCH("/:id", func(c *gin.Context) {
 			id := c.Param("id")
 			req := struct {
-				IsActive bool `json:"is_active"`
+				IsActive bool `json:"is_active" binding:"required"`
 			}{}
-			err := c.BindJSON(&req)
+			err := c.ShouldBindJSON(&req)
 			if err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
@@ -96,7 +90,7 @@ func main() {
 			// wg.Add(1)
 			// go Agent(ctx, &wg, alpha)
 
-			err = db.Model(&Endpoint{}).Where("id = ?", id).Update("active", req.IsActive).Error
+			err = db.Model(&Endpoint{}).Where("id = ?", id).Update("is_active", req.IsActive).Error
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
@@ -117,7 +111,9 @@ func main() {
 		})
 	}
 
-	time.Sleep(5 * time.Minute)
+	if err := router.Run(":8000"); err != nil {
+		log.Fatal("router failed, err:", err.Error())
+	}
 }
 
 func PostgresConn() (*gorm.DB, error) {
