@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -14,10 +17,13 @@ import (
 
 type Endpoint struct {
 	gorm.Model
-	URL      string
-	Interval int // in seconds
-	Retries  int // retries before submitting failure
+	URL        string
+	Interval   int // in seconds
+	Retries    int // retries before submitting failure
+	LastStatus bool
 }
+
+const WebhookURL = "http://localhost:9000/webhook"
 
 var (
 	alpha = &Endpoint{
@@ -109,13 +115,45 @@ func Agent(ctx context.Context, wg *sync.WaitGroup, endpoint *Endpoint) {
 				tries++
 				log.Println(endpoint.URL, "healthcheck failed, try ", tries, ", err:", err.Error())
 				if tries >= endpoint.Retries {
+					tries = 0
 					log.Println(endpoint.URL, "endpoint is unhealthy")
-					return
+					if endpoint.LastStatus {
+						endpoint.LastStatus = false
+						Webhook(endpoint.ID, false)
+					}
 				}
 				continue
 			}
 			tries = 0
+			if !endpoint.LastStatus {
+				endpoint.LastStatus = true
+				Webhook(endpoint.ID, true)
+			}
 			log.Println(endpoint.URL, "endpoint is healthy")
 		}
 	}
+}
+
+func Webhook(endpointID uint, status bool) error {
+	payload := struct {
+		Status bool `json:"status"`
+	}{
+		Status: status,
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(fmt.Sprintf("%s/%v", WebhookURL, endpointID), "application/json", bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("webhook failed")
+	}
+
+	return nil
 }
