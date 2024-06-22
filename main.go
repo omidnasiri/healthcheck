@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -21,6 +22,7 @@ type Endpoint struct {
 	Interval   int // in seconds
 	Retries    int // retries before submitting failure
 	LastStatus bool
+	IsActive   bool
 }
 
 const WebhookURL = "http://localhost:9000/webhook"
@@ -40,22 +42,80 @@ var (
 )
 
 func main() {
-	_, err := PostgresConn()
+	db, err := PostgresConn()
 	if err != nil {
 		log.Fatal("db connection failed, err:", err.Error())
 	}
 
-	// _ = RegisterEndpoint(db, alpha)
-	// _ = RegisterEndpoint(db, beta)
+	// ctx, _ := context.WithCancel(context.Background())
+	// var wg sync.WaitGroup
 
-	ctx, _ := context.WithCancel(context.Background())
-	var wg sync.WaitGroup
+	router := gin.Default()
+	endpointRoutes := router.Group("/endpoints")
+	{
+		endpointRoutes.POST("", func(c *gin.Context) {
+			var endpoint Endpoint
+			err := c.BindJSON(&endpoint)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
 
-	wg.Add(1)
-	go Agent(ctx, &wg, alpha)
+			err = db.Create(endpoint).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
 
-	// wg.Add(1)
-	// go Agent(ctx, &wg, beta)
+			c.JSON(http.StatusOK, gin.H{"message": "endpoint registered"})
+		})
+
+		endpointRoutes.GET("", func(c *gin.Context) {
+			var endpoints []*Endpoint
+			err := db.Find(&endpoints).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, endpoints)
+		})
+
+		endpointRoutes.PATCH("/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			req := struct {
+				IsActive bool `json:"is_active"`
+			}{}
+			err := c.BindJSON(&req)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			// todo: stop or start agent
+			// wg.Add(1)
+			// go Agent(ctx, &wg, alpha)
+
+			err = db.Model(&Endpoint{}).Where("id = ?", id).Update("active", req.IsActive).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"message": "endpoint updated"})
+		})
+
+		endpointRoutes.DELETE("/:id", func(c *gin.Context) {
+			id := c.Param("id")
+			err := db.Delete(&Endpoint{}, id).Error
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{"message": "endpoint deleted"})
+		})
+	}
 
 	time.Sleep(5 * time.Minute)
 }
@@ -73,20 +133,6 @@ func PostgresConn() (*gorm.DB, error) {
 	}
 
 	return db, nil
-}
-
-func RegisterEndpoint(db *gorm.DB, endpoint *Endpoint) error {
-	if endpoint == nil {
-		return errors.New("empty endpoint")
-	}
-
-	err := db.Create(endpoint).Error
-	if err != nil {
-		log.Println("endpoint registration failed, err", err.Error())
-		return err
-	}
-
-	return nil
 }
 
 func HealthCheck(url string) error {
