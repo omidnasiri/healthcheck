@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"log"
+	"net/http"
+	"sync"
+	"time"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -17,26 +21,37 @@ type Endpoint struct {
 
 var (
 	alpha = &Endpoint{
-		URL:      "http://localhost:8080",
-		Interval: 30,
+		URL:      "http://localhost:8080/alpha",
+		Interval: 5,
 		Retries:  3,
 	}
 
 	beta = &Endpoint{
-		URL:      "http://localhost:8081",
-		Interval: 30,
+		URL:      "http://localhost:8081/beta",
+		Interval: 5,
 		Retries:  3,
 	}
 )
 
 func main() {
-	db, err := PostgresConn()
+	_, err := PostgresConn()
 	if err != nil {
 		log.Fatal("db connection failed, err:", err.Error())
 	}
 
-	_ = RegisterEndpoint(db, alpha)
-	_ = RegisterEndpoint(db, beta)
+	// _ = RegisterEndpoint(db, alpha)
+	// _ = RegisterEndpoint(db, beta)
+
+	ctx, _ := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go Agent(ctx, &wg, alpha)
+
+	wg.Add(1)
+	go Agent(ctx, &wg, beta)
+
+	time.Sleep(5 * time.Minute)
 }
 
 func PostgresConn() (*gorm.DB, error) {
@@ -66,4 +81,34 @@ func RegisterEndpoint(db *gorm.DB, endpoint *Endpoint) error {
 	}
 
 	return nil
+}
+
+func HealthCheck(url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("unhealthy")
+	}
+
+	return nil
+}
+
+func Agent(ctx context.Context, wg *sync.WaitGroup, endpoint *Endpoint) {
+	defer wg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Duration(endpoint.Interval) * time.Second):
+			err := HealthCheck(endpoint.URL)
+			if err != nil {
+				log.Println(endpoint.URL, "healthcheck failed, err:", err.Error())
+				continue
+			}
+			log.Println(endpoint.URL, "endpoint is healthy")
+		}
+	}
 }

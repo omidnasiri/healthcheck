@@ -10,11 +10,14 @@ func main() {
 
 	http.HandleFunc("/alpha", func(w http.ResponseWriter, r *http.Request) {
 		chance := rand.Intn(100)
+		var status int
 		if chance < 90 {
-			w.WriteHeader(http.StatusOK)
+			status = http.StatusOK
 		} else {
-			w.WriteHeader(http.StatusInternalServerError)
+			status = http.StatusInternalServerError
 		}
+		log.Println("alpha server status:", status)
+		w.WriteHeader(status)
 	})
 
 	log.Println("alpha server listening on port 8080")
