@@ -27,7 +27,7 @@ type endpointRepository struct {
 }
 
 func NewEndpointRepository(db *gorm.DB) EndpointRepository {
-	return &endpointRepository{db: db}
+	return &endpointRepository{db}
 }
 
 func (r *endpointRepository) Create(model *model.Endpoint) error {

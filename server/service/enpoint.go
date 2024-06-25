@@ -17,7 +17,7 @@ type endpointService struct {
 }
 
 func NewEndpointService(endpointRepo repository.EndpointRepository) EndpointService {
-	return &endpointService{endpointRepo: endpointRepo}
+	return &endpointService{endpointRepo}
 }
 
 func (s *endpointService) CreateEndpoint(url string, interval, retries int) error {
@@ -47,6 +47,10 @@ func (s *endpointService) UpdateEndpointActivationStatus(id uint, isActive bool)
 	if err := s.endpointRepo.UpdateActivationStatus(id, isActive); err != nil {
 		return err
 	}
+
+	// todo: stop or start agent
+	// wg.Add(1)
+	// go Agent(ctx, &wg, alpha)
 
 	return nil
 }
