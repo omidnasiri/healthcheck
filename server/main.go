@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"healthcheck/internal/model"
+	"healthcheck/pkg/postgres"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -28,9 +29,14 @@ type Endpoint struct {
 const WebhookURL = "http://localhost:9000/webhook"
 
 func main() {
-	db, err := PostgresConn()
+	dsn := "host=localhost user=postgres password=mysecretpassword dbname=healthcheck port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+	db, err := postgres.Connect(dsn, nil)
 	if err != nil {
 		log.Fatal("db connection failed, err:", err.Error())
+	}
+
+	if err := postgres.Migrate(db, &model.Endpoint{}); err != nil {
+		log.Fatal("db migration failed, err:", err.Error())
 	}
 
 	// ctx, _ := context.WithCancel(context.Background())
@@ -114,21 +120,6 @@ func main() {
 	if err := router.Run(":8000"); err != nil {
 		log.Fatal("router failed, err:", err.Error())
 	}
-}
-
-func PostgresConn() (*gorm.DB, error) {
-	dsn := "host=localhost user=postgres password=mysecretpassword dbname=healthcheck port=5432 sslmode=disable TimeZone=Asia/Shanghai"
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.AutoMigrate(&Endpoint{})
-	if err != nil {
-		return nil, err
-	}
-
-	return db, nil
 }
 
 func HealthCheck(url string) error {
