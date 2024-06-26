@@ -20,7 +20,7 @@ func main() {
 		w.WriteHeader(status)
 	})
 
-	log.Println("beta server listening on port 8080")
+	log.Println("beta server listening on port 8081")
 	if err := http.ListenAndServe(":8081", nil); err != nil {
 		log.Fatalln(err)
 	}

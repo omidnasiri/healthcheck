@@ -8,7 +8,7 @@ mock-beta:
 
 .PHONY: build
 build:
-	go build -o ./healthcheck server/cmd/main.go
+	go build -o ./healthcheck cmd/main.go
 
 .PHONY: run
 run:build
