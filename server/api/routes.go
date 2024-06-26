@@ -13,7 +13,7 @@ func SetupRoutes(container *ControllerContainer) *gin.Engine {
 				endpoints.POST("/", container.V1.EndpointController.CreateEndpoint)
 				endpoints.GET("/", container.V1.EndpointController.FetchAllEndpoints)
 				endpoints.PATCH("/:id", container.V1.EndpointController.UpdateEndpointActivationStatus)
-				endpoints.GET("/:id", container.V1.EndpointController.DeleteEndpoint)
+				endpoints.DELETE("/:id", container.V1.EndpointController.DeleteEndpoint)
 			}
 		}
 	}
