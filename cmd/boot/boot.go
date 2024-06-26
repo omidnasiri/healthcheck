@@ -1,17 +1,21 @@
 package boot
 
 import (
+	"fmt"
 	"healthcheck/api"
+	"healthcheck/config"
 	"healthcheck/internal/model"
 	"healthcheck/pkg/postgres"
 	"log"
 )
 
-func Up() (map[string]func(), error) {
+func Up(cfg *config.Config) (map[string]func(), error) {
 	// closeFunctions is a map of functions that will be called on shutdown
 	closeFunctions := make(map[string]func())
 
-	dsn := "host=localhost user=postgres password=mysecretpassword dbname=healthcheck port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+		cfg.DB.Host, cfg.DB.User, cfg.DB.Password,
+		cfg.DB.DBName, cfg.DB.Port)
 	db, err := postgres.Connect(dsn, nil)
 	if err != nil {
 		log.Println("db connection failed, err:", err.Error())

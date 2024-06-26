@@ -7,18 +7,37 @@ import (
 	"errors"
 	"fmt"
 	"healthcheck/cmd/boot"
+	"healthcheck/config"
 	"healthcheck/internal/model"
 	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
-const WebhookURL = "http://localhost:9000/webhook"
+var APP_ENV = os.Getenv("APP_ENV")
 
 func main() {
+	// load env
+	if APP_ENV == "" {
+		if err := godotenv.Load(); err != nil {
+			log.Fatal("Error loading .env file, err:", err.Error())
+		}
+	}
+
+	// load config
+	conf := &config.Config{}
+	if err := setEnvConf(conf); err != nil {
+		slog.Error("could not map configurations", "error", err.Error())
+		os.Exit(1)
+	}
+
 	// boot
-	closeFunctions, err := boot.Up()
+	closeFunctions, err := boot.Up(conf)
 	if err != nil {
 		log.Println("could not boot", "err", err.Error())
 	}
@@ -26,6 +45,18 @@ func main() {
 	// shutdown
 	boot.Down(closeFunctions)
 	log.Println("shutdown completed")
+}
+
+func setEnvConf(cfg *config.Config) error {
+	cfg.DB.Host = os.Getenv("POSTGRES_HOST")
+	cfg.DB.Port = os.Getenv("POSTGRES_PORT")
+	cfg.DB.User = os.Getenv("POSTGRES_USER")
+	cfg.DB.Password = os.Getenv("POSTGRES_PASSWORD")
+	cfg.DB.DBName = os.Getenv("POSTGRES_DB")
+
+	cfg.WebhookURL = os.Getenv("WEBHOOK_URL")
+
+	return nil
 }
 
 func HealthCheck(url string) error {
@@ -85,7 +116,7 @@ func Webhook(endpointID uint, status bool) error {
 		return err
 	}
 
-	resp, err := http.Post(fmt.Sprintf("%s/%v", WebhookURL, endpointID), "application/json", bytes.NewBuffer(jsonPayload))
+	resp, err := http.Post(fmt.Sprintf("%s/%v", "WebhookURL", endpointID), "application/json", bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return err
 	}
