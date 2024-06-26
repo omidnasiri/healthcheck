@@ -6,6 +6,10 @@ mock-alpha:
 mock-beta:
 	go run ./mocks/beta/beta.go
 
+.PHONY: mock-webhook
+mock-webhook:
+	go run ./mocks/webhook/webhook.go
+
 .PHONY: build
 build:
 	go build -o ./healthcheck cmd/main.go

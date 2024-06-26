@@ -10,7 +10,6 @@ import (
 	"healthcheck/config"
 	"healthcheck/internal/model"
 	"log"
-	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -32,8 +31,7 @@ func main() {
 	// load config
 	conf := &config.Config{}
 	if err := setEnvConf(conf); err != nil {
-		slog.Error("could not map configurations", "error", err.Error())
-		os.Exit(1)
+		log.Fatal("could not map configurations", "err", err.Error())
 	}
 
 	// boot
