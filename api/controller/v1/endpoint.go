@@ -50,7 +50,7 @@ func (c *EndpointController) FetchAllEndpoints(ctx *gin.Context) {
 func (c *EndpointController) UpdateEndpointActivationStatus(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	req := struct {
-		IsActive bool `json:"is_active" binding:"required"`
+		Check string `json:"check" binding:"required"`
 	}{}
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
@@ -63,7 +63,18 @@ func (c *EndpointController) UpdateEndpointActivationStatus(ctx *gin.Context) {
 		return
 	}
 
-	err = c.endpointService.UpdateEndpointActivationStatus(uint(id), req.IsActive)
+	var status bool
+	switch req.Check {
+	case "activate":
+		status = true
+	case "deactivate":
+		status = false
+	default:
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid check"})
+		return
+	}
+
+	err = c.endpointService.UpdateEndpointActivationStatus(uint(id), status)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

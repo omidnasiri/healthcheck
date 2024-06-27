@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 func main() {
 
-	http.HandleFunc("/webhook/:id", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/webhook/{id}", func(w http.ResponseWriter, r *http.Request) {
 		payload := struct {
 			Status bool `json:"status"`
 		}{}
@@ -21,7 +22,7 @@ func main() {
 			return
 		}
 
-		log.Println("webhook called, id: ", r.URL.Query().Get("id"), "status:", payload.Status)
+		log.Println("webhook called, id: ", strings.TrimPrefix(r.URL.Path, "/webhook/"), "status:", payload.Status)
 		w.WriteHeader(http.StatusOK)
 	})
 

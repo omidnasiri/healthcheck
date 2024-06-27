@@ -53,7 +53,7 @@ func (s *endpointService) CreateEndpoint(url string, interval, retries int) erro
 		return err
 	}
 
-	if err := s.healthCheckAgentRepo.Create(model, agentBuilder(s.webhookURL)); err != nil {
+	if err := s.healthCheckAgentRepo.Create(model, s.agentFactory()); err != nil {
 		return err
 	}
 
@@ -80,7 +80,7 @@ func (s *endpointService) UpdateEndpointActivationStatus(id uint, isActive bool)
 		}
 	}
 
-	if err := s.endpointRepo.UpdateActivationStatus(id, isActive); err != nil {
+	if err := s.endpointRepo.UpdateCheckActivation(id, isActive); err != nil {
 		return err
 	}
 
@@ -106,8 +106,8 @@ func (s *endpointService) bootstrap() error {
 	}
 
 	for _, model := range models {
-		if model.IsActive {
-			if err := s.healthCheckAgentRepo.Create(model, agentBuilder(s.webhookURL)); err != nil {
+		if model.ActiveCheck {
+			if err := s.healthCheckAgentRepo.Create(model, s.agentFactory()); err != nil {
 				log.Println("failed to create health check agent for endpoint ", model.ID, ", err:", err.Error())
 				continue
 			}
@@ -122,7 +122,7 @@ func (s *endpointService) bootstrap() error {
 	return nil
 }
 
-func agentBuilder(webhookURL string) model.HealthCheckAgentFunctionSignature {
+func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature {
 	healthCheck := func(url string) error {
 		resp, err := http.Get(url)
 		if err != nil {
@@ -134,7 +134,7 @@ func agentBuilder(webhookURL string) model.HealthCheckAgentFunctionSignature {
 		return nil
 	}
 
-	webhook := func(endpointID uint, status bool) error {
+	webhook := func(endpointID uint, status bool) {
 		payload := struct {
 			Status bool `json:"status"`
 		}{
@@ -143,19 +143,30 @@ func agentBuilder(webhookURL string) model.HealthCheckAgentFunctionSignature {
 
 		jsonPayload, err := json.Marshal(payload)
 		if err != nil {
-			return err
+			log.Println("failed to marshal json payload, err:", err.Error())
+			return
 		}
 
-		resp, err := http.Post(fmt.Sprintf("%s/%v", webhookURL, endpointID), "application/json", bytes.NewBuffer(jsonPayload))
+		resp, err := http.Post(fmt.Sprintf("%s/%v", s.webhookURL, endpointID), "application/json", bytes.NewBuffer(jsonPayload))
 		if err != nil {
-			return err
+			log.Println("failed to send webhook, err:", err.Error())
+			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			return errors.New("webhook failed")
+			log.Println("webhook failed")
+			return
+		}
+	}
+
+	updateStatus := func(endpoint *model.Endpoint, status bool) {
+		endpoint.LastStatus = status
+
+		if err := s.endpointRepo.UpdateLastStatus(endpoint.ID, status); err != nil {
+			log.Println("failed to update last status for endpoint ", endpoint.ID, ", err:", err.Error())
 		}
 
-		return nil
+		webhook(endpoint.ID, status)
 	}
 
 	return func(ctx context.Context, wg *sync.WaitGroup, endpoint *model.Endpoint) {
@@ -174,16 +185,14 @@ func agentBuilder(webhookURL string) model.HealthCheckAgentFunctionSignature {
 						tries = 0
 						log.Println(endpoint.URL, "endpoint is unhealthy")
 						if endpoint.LastStatus {
-							endpoint.LastStatus = false
-							webhook(endpoint.ID, false)
+							updateStatus(endpoint, false)
 						}
 					}
 					continue
 				}
 				tries = 0
 				if !endpoint.LastStatus {
-					endpoint.LastStatus = true
-					webhook(endpoint.ID, true)
+					updateStatus(endpoint, true)
 				}
 				log.Println(endpoint.URL, "endpoint is healthy")
 			}

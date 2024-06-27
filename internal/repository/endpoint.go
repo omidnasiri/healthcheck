@@ -18,7 +18,8 @@ var (
 type EndpointRepository interface {
 	Create(model *model.Endpoint) error
 	FetchAll() ([]*model.Endpoint, error)
-	UpdateActivationStatus(id uint, isActive bool) error
+	UpdateCheckActivation(id uint, isActive bool) error
+	UpdateLastStatus(id uint, status bool) error
 	Delete(id uint) error
 }
 
@@ -47,8 +48,16 @@ func (r *endpointGormRepository) FetchAll() ([]*model.Endpoint, error) {
 	return model, nil
 }
 
-func (r *endpointGormRepository) UpdateActivationStatus(id uint, isActive bool) error {
-	if err := r.db.Model(&model.Endpoint{}).Where("id = ?", id).Update("is_active", isActive).Error; err != nil {
+func (r *endpointGormRepository) UpdateCheckActivation(id uint, isActive bool) error {
+	if err := r.db.Model(&model.Endpoint{}).Where("id = ?", id).Update("active_check", isActive).Error; err != nil {
+		log.Printf("error updating endpoint activation status => %v", err)
+		return ErrUpdate
+	}
+	return nil
+}
+
+func (r *endpointGormRepository) UpdateLastStatus(id uint, status bool) error {
+	if err := r.db.Model(&model.Endpoint{}).Where("id = ?", id).Update("last_status", status).Error; err != nil {
 		log.Printf("error updating endpoint activation status => %v", err)
 		return ErrUpdate
 	}
