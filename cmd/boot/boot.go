@@ -30,11 +30,17 @@ func Up(cfg *config.Config) (map[string]func(), error) {
 	}
 
 	wg := &sync.WaitGroup{}
-	container := Inject(db, wg, cfg)
+	container, err := Inject(db, wg, cfg)
+	if err != nil {
+		log.Println("dependency injection failed, err:", err.Error())
+		return closeFunctions, err
+	}
+
 	router := api.SetupRoutes(container)
 
 	if err := router.Run(":8000"); err != nil {
-		log.Fatal("router failed, err:", err.Error())
+		log.Println("router failed, err:", err.Error())
+		return closeFunctions, err
 	}
 
 	wg.Wait()

@@ -11,17 +11,20 @@ import (
 	"gorm.io/gorm"
 )
 
-func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config) *api.ControllerContainer {
+func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config) (*api.ControllerContainer, error) {
 
 	// Repositories
 	endpointRepo := repository.NewEndpointRepository(db)
 	healthCheckAgentRepo := repository.NewAgentInMemoryRepository()
 
 	// Services
-	endpointService := service.NewEndpointService(cfg.WebhookURL, wg, endpointRepo, healthCheckAgentRepo)
+	endpointService, err := service.NewEndpointService(cfg.WebhookURL, wg, endpointRepo, healthCheckAgentRepo)
+	if err != nil {
+		return nil, err
+	}
 
 	// Controllers
 	endpointController := controllerV1.NewEndpointController(endpointService)
 
-	return api.NewControllerContainer(endpointController)
+	return api.NewControllerContainer(endpointController), nil
 }

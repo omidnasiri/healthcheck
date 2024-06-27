@@ -33,8 +33,13 @@ func NewEndpointService(
 	wg *sync.WaitGroup,
 	endpointRepo repository.EndpointRepository,
 	healthCheckAgentRepo repository.HealthCheckAgentRepository,
-) EndpointService {
-	return &endpointService{webhookURL, wg, endpointRepo, healthCheckAgentRepo}
+) (EndpointService, error) {
+	endpointService := &endpointService{webhookURL, wg, endpointRepo, healthCheckAgentRepo}
+	if err := endpointService.bootstrap(); err != nil {
+		log.Println("failed to bootstrap endpoint service, err:", err.Error())
+		return nil, err
+	}
+	return endpointService, nil
 }
 
 func (s *endpointService) CreateEndpoint(url string, interval, retries int) error {
@@ -91,6 +96,29 @@ func (s *endpointService) DeleteEndpoint(id uint) error {
 		return err
 	}
 
+	return nil
+}
+
+func (s *endpointService) bootstrap() error {
+	models, err := s.FetchAllEndpoints()
+	if err != nil {
+		return err
+	}
+
+	for _, model := range models {
+		if model.IsActive {
+			if err := s.healthCheckAgentRepo.Create(model, agentBuilder(s.webhookURL)); err != nil {
+				log.Println("failed to create health check agent for endpoint ", model.ID, ", err:", err.Error())
+				continue
+			}
+
+			if err := s.healthCheckAgentRepo.Start(model.ID, s.wg); err != nil {
+				log.Println("failed to start health check agent for endpoint ", model.ID, ", err:", err.Error())
+			}
+		}
+	}
+
+	log.Println("all health check agents started")
 	return nil
 }
 
