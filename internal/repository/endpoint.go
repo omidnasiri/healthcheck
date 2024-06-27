@@ -22,15 +22,15 @@ type EndpointRepository interface {
 	Delete(id uint) error
 }
 
-type endpointRepository struct {
+type endpointGormRepository struct {
 	db *gorm.DB
 }
 
 func NewEndpointRepository(db *gorm.DB) EndpointRepository {
-	return &endpointRepository{db}
+	return &endpointGormRepository{db}
 }
 
-func (r *endpointRepository) Create(model *model.Endpoint) error {
+func (r *endpointGormRepository) Create(model *model.Endpoint) error {
 	if err := r.db.Create(model).Error; err != nil {
 		log.Printf("error creating endpoint => %v", err)
 		return ErrCreate
@@ -38,16 +38,16 @@ func (r *endpointRepository) Create(model *model.Endpoint) error {
 	return nil
 }
 
-func (r *endpointRepository) FetchAll() ([]*model.Endpoint, error) {
-	var models []*model.Endpoint
-	if err := r.db.Find(&models).Error; err != nil {
+func (r *endpointGormRepository) FetchAll() ([]*model.Endpoint, error) {
+	var model []*model.Endpoint
+	if err := r.db.Find(&model).Error; err != nil {
 		log.Printf("error fetching endpoints => %v", err)
 		return nil, ErrFetch
 	}
-	return models, nil
+	return model, nil
 }
 
-func (r *endpointRepository) UpdateActivationStatus(id uint, isActive bool) error {
+func (r *endpointGormRepository) UpdateActivationStatus(id uint, isActive bool) error {
 	if err := r.db.Model(&model.Endpoint{}).Where("id = ?", id).Update("is_active", isActive).Error; err != nil {
 		log.Printf("error updating endpoint activation status => %v", err)
 		return ErrUpdate
@@ -55,7 +55,7 @@ func (r *endpointRepository) UpdateActivationStatus(id uint, isActive bool) erro
 	return nil
 }
 
-func (r *endpointRepository) Delete(id uint) error {
+func (r *endpointGormRepository) Delete(id uint) error {
 	if err := r.db.Delete(&model.Endpoint{}, id).Error; err != nil {
 		log.Printf("error deleting endpoint => %v", err)
 		return ErrDelete

@@ -7,6 +7,7 @@ import (
 	"healthcheck/internal/model"
 	"healthcheck/pkg/postgres"
 	"log"
+	"sync"
 )
 
 func Up(cfg *config.Config) (map[string]func(), error) {
@@ -28,13 +29,15 @@ func Up(cfg *config.Config) (map[string]func(), error) {
 		return closeFunctions, err
 	}
 
-	container := Inject(db)
+	wg := &sync.WaitGroup{}
+	container := Inject(db, wg, cfg)
 	router := api.SetupRoutes(container)
 
 	if err := router.Run(":8000"); err != nil {
 		log.Fatal("router failed, err:", err.Error())
 	}
 
+	wg.Wait()
 	return closeFunctions, nil
 }
 
