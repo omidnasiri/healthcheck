@@ -154,7 +154,7 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			log.Println("webhook failed")
+			log.Println("webhook failed, status:", resp.StatusCode)
 			return
 		}
 	}

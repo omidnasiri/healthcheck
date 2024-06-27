@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"errors"
+	"healthcheck/api/presenter"
 	"healthcheck/service"
 	"net/http"
 	"strconv"
@@ -24,27 +26,29 @@ func (c *EndpointController) CreateEndpoint(ctx *gin.Context) {
 	}{}
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
 		return
 	}
 
 	err = c.endpointService.CreateEndpoint(req.URL, req.Interval, req.Retries)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{"message": "endpoint registered successfully"})
+	presenter.Success(ctx, "endpoint registered successfully")
 }
 
 func (c *EndpointController) FetchAllEndpoints(ctx *gin.Context) {
 	endpoints, err := c.endpointService.FetchAllEndpoints()
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
+		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"endpoints": endpoints})
+	presenter.Success(ctx, endpoints)
 }
 
 func (c *EndpointController) UpdateEndpointActivationStatus(ctx *gin.Context) {
@@ -54,12 +58,12 @@ func (c *EndpointController) UpdateEndpointActivationStatus(ctx *gin.Context) {
 	}{}
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
 		return
 	}
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		presenter.Failure(ctx, http.StatusBadRequest, errors.New("invalid id"))
 		return
 	}
 
@@ -70,32 +74,34 @@ func (c *EndpointController) UpdateEndpointActivationStatus(ctx *gin.Context) {
 	case "deactivate":
 		status = false
 	default:
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid check"})
+		presenter.Failure(ctx, http.StatusBadRequest, errors.New("invalid check"))
 		return
 	}
 
 	err = c.endpointService.UpdateEndpointActivationStatus(uint(id), status)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
+		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "endpoint updated successfully"})
+	presenter.Success(ctx, "endpoint updated successfully")
 }
 
 func (c *EndpointController) DeleteEndpoint(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil || id <= 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		presenter.Failure(ctx, http.StatusBadRequest, errors.New("invalid id"))
 		return
 	}
 
 	err = c.endpointService.DeleteEndpoint(uint(id))
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		presenter.Failure(ctx, http.StatusBadRequest, err)
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "endpoint deleted successfully"})
+	presenter.Success(ctx, "endpoint deleted successfully")
 }
