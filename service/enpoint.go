@@ -48,7 +48,7 @@ func (s *endpointService) CreateEndpoint(url string, interval, retries int) erro
 		return err
 	}
 
-	if err := s.healthCheckAgentRepo.Create(model, agent); err != nil {
+	if err := s.healthCheckAgentRepo.Create(model, agentBuilder(s.webhookURL)); err != nil {
 		return err
 	}
 
@@ -94,71 +94,71 @@ func (s *endpointService) DeleteEndpoint(id uint) error {
 	return nil
 }
 
-func healthCheck(url string) error {
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
+func agentBuilder(webhookURL string) model.HealthCheckAgentFunctionSignature {
+	healthCheck := func(url string) error {
+		resp, err := http.Get(url)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode != http.StatusOK {
+			return errors.New("unhealthy")
+		}
+		return nil
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("unhealthy")
+	webhook := func(endpointID uint, status bool) error {
+		payload := struct {
+			Status bool `json:"status"`
+		}{
+			Status: status,
+		}
+
+		jsonPayload, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+
+		resp, err := http.Post(fmt.Sprintf("%s/%v", webhookURL, endpointID), "application/json", bytes.NewBuffer(jsonPayload))
+		if err != nil {
+			return err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return errors.New("webhook failed")
+		}
+
+		return nil
 	}
 
-	return nil
-}
-
-func agent(ctx context.Context, wg *sync.WaitGroup, endpoint *model.Endpoint) {
-	defer wg.Done()
-	tries := 0
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(time.Duration(endpoint.Interval) * time.Second):
-			err := healthCheck(endpoint.URL)
-			if err != nil {
-				tries++
-				log.Println(endpoint.URL, "health check failed, try ", tries, ", err:", err.Error())
-				if tries >= endpoint.Retries {
-					tries = 0
-					log.Println(endpoint.URL, "endpoint is unhealthy")
-					if endpoint.LastStatus {
-						endpoint.LastStatus = false
-						webhook(endpoint.ID, false)
+	return func(ctx context.Context, wg *sync.WaitGroup, endpoint *model.Endpoint) {
+		defer wg.Done()
+		tries := 0
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(time.Duration(endpoint.Interval) * time.Second):
+				err := healthCheck(endpoint.URL)
+				if err != nil {
+					tries++
+					log.Println(endpoint.URL, "health check failed, try ", tries, ", err:", err.Error())
+					if tries >= endpoint.Retries {
+						tries = 0
+						log.Println(endpoint.URL, "endpoint is unhealthy")
+						if endpoint.LastStatus {
+							endpoint.LastStatus = false
+							webhook(endpoint.ID, false)
+						}
 					}
+					continue
 				}
-				continue
+				tries = 0
+				if !endpoint.LastStatus {
+					endpoint.LastStatus = true
+					webhook(endpoint.ID, true)
+				}
+				log.Println(endpoint.URL, "endpoint is healthy")
 			}
-			tries = 0
-			if !endpoint.LastStatus {
-				endpoint.LastStatus = true
-				webhook(endpoint.ID, true)
-			}
-			log.Println(endpoint.URL, "endpoint is healthy")
 		}
 	}
-}
-
-func webhook(endpointID uint, status bool) error {
-	payload := struct {
-		Status bool `json:"status"`
-	}{
-		Status: status,
-	}
-
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-
-	resp, err := http.Post(fmt.Sprintf("%s/%v", "WebhookURL", endpointID), "application/json", bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.New("webhook failed")
-	}
-
-	return nil
 }
