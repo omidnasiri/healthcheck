@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"healthcheck/internal/model"
 	"healthcheck/internal/repository"
+	httpclient "healthcheck/pkg/http_client"
 	"log"
 	"net/http"
 	"sync"
@@ -15,7 +16,7 @@ import (
 )
 
 type EndpointService interface {
-	CreateEndpoint(url string, interval, retries int) error
+	CreateEndpoint(url, httpMethod, httpRequestHeaders, httpRequestBody string, interval, retries int) error
 	FetchAllEndpoints() ([]*model.Endpoint, error)
 	UpdateEndpointActivationStatus(id uint, isActive bool) error
 	DeleteEndpoint(id uint) error
@@ -45,15 +46,35 @@ func NewEndpointService(
 	return endpointService, nil
 }
 
-func (s *endpointService) CreateEndpoint(url string, interval, retries int) error {
+func (s *endpointService) CreateEndpoint(url, httpMethod, httpRequestHeaders, httpRequestBody string, interval, retries int) error {
+	err := model.HTTPMethod(httpMethod).Validate()
+	if err != nil {
+		return err
+	}
+
 	model := &model.Endpoint{
-		URL:      url,
-		Interval: interval,
-		Retries:  retries,
+		URL:                url,
+		HTTPMethod:         model.HTTPMethod(httpMethod),
+		HTTPRequestHeaders: httpRequestHeaders,
+		HTTPRequestBody:    httpRequestBody,
+		Interval:           interval,
+		Retries:            retries,
 	}
 
 	if err := s.endpointRepo.Create(model); err != nil {
 		return err
+	}
+
+	Headers := []struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}{}
+	if err := json.Unmarshal([]byte(httpRequestHeaders), &Headers); err != nil {
+		return err
+	}
+	model.Headers = make(map[string]string)
+	for i := range Headers {
+		model.Headers[Headers[i].Key] = Headers[i].Value
 	}
 
 	if err := s.healthCheckAgentRepo.Create(model, s.agentFactory()); err != nil {
@@ -142,12 +163,26 @@ func (s *endpointService) bootstrap() error {
 }
 
 func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature {
-	healthCheck := func(url string) error {
-		resp, err := http.Get(url)
+	healthCheck := func(endpoint *model.Endpoint) error {
+		var err error
+		var body []byte
+		var respStatusCode int
+
+		body, respStatusCode, err = httpclient.Do(
+			context.Background(),
+			string(endpoint.HTTPMethod),
+			endpoint.URL,
+			[]byte(endpoint.HTTPRequestBody),
+			time.Duration(endpoint.Interval),
+			endpoint.Headers,
+		)
 		if err != nil {
 			return err
 		}
-		if resp.StatusCode != http.StatusOK {
+
+		s.checkLogRepo.Create(endpoint.ID, respStatusCode, string(body))
+
+		if respStatusCode != http.StatusOK {
 			return errors.New("unhealthy")
 		}
 		return nil
@@ -197,9 +232,8 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 				log.Println(endpoint.URL, "health check agent is shutting down")
 				return
 			case <-time.After(time.Duration(endpoint.Interval) * time.Second):
-				err := healthCheck(endpoint.URL)
+				err := healthCheck(endpoint)
 				if err != nil {
-					s.checkLogRepo.Create(endpoint.ID, false)
 					tries++
 					log.Println(endpoint.URL, "health check failed, try ", tries, ", err:", err.Error())
 					if tries >= endpoint.Retries {
@@ -211,7 +245,6 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 					}
 					continue
 				}
-				s.checkLogRepo.Create(endpoint.ID, false)
 				tries = 0
 				if !endpoint.LastStatus {
 					updateStatus(endpoint, true)

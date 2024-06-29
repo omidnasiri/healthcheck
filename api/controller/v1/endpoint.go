@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"errors"
 	"healthcheck/api/presenter"
 	"healthcheck/service"
@@ -20,9 +21,15 @@ func NewEndpointController(endpointService service.EndpointService) *EndpointCon
 
 func (c *EndpointController) CreateEndpoint(ctx *gin.Context) {
 	req := struct {
-		URL      string `json:"url" binding:"required"`
-		Interval int    `json:"interval" binding:"required"`
-		Retries  int    `json:"retries" binding:"required"`
+		URL                string `json:"url" binding:"required"`
+		Interval           int    `json:"interval" binding:"required"`
+		Retries            int    `json:"retries" binding:"required"`
+		HTTPMethod         string `json:"http_method" binding:"required"`
+		HTTPRequestHeaders []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"http_request_headers"`
+		HTTPRequestBody string `json:"http_request_body"`
 	}{}
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
@@ -30,7 +37,13 @@ func (c *EndpointController) CreateEndpoint(ctx *gin.Context) {
 		return
 	}
 
-	err = c.endpointService.CreateEndpoint(req.URL, req.Interval, req.Retries)
+	headers, err := json.Marshal(req.HTTPRequestHeaders)
+	if err != nil {
+		presenter.Failure(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	err = c.endpointService.CreateEndpoint(req.URL, req.HTTPMethod, string(headers), req.HTTPRequestBody, req.Interval, req.Retries)
 	if err != nil {
 		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		presenter.Failure(ctx, http.StatusBadRequest, err)

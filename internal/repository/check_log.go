@@ -8,7 +8,7 @@ import (
 )
 
 type CheckLogRepository interface {
-	Create(endpointID uint, status bool) error
+	Create(endpointID uint, statusCode int, body string) error
 	FetchByEndpointID(endpointID uint) ([]*model.Endpoint, error)
 }
 
@@ -20,8 +20,8 @@ func NewCheckLogRepository(db *gorm.DB) CheckLogRepository {
 	return &checkLogRepository{db}
 }
 
-func (r *checkLogRepository) Create(endpointID uint, status bool) error {
-	model := &model.CheckLog{EndpointID: endpointID, Result: status}
+func (r *checkLogRepository) Create(endpointID uint, statusCode int, body string) error {
+	model := &model.CheckLog{EndpointID: endpointID, ResultStatusCode: statusCode, ResultBody: body}
 	if err := r.db.Create(model).Error; err != nil {
 		log.Printf("error creating check log => %v", err)
 		return ErrCreate
