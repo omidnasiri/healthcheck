@@ -19,6 +19,7 @@ type EndpointService interface {
 	FetchAllEndpoints() ([]*model.Endpoint, error)
 	UpdateEndpointActivationStatus(id uint, isActive bool) error
 	DeleteEndpoint(id uint) error
+	Shutdown()
 }
 
 type endpointService struct {
@@ -101,6 +102,22 @@ func (s *endpointService) DeleteEndpoint(id uint) error {
 	return nil
 }
 
+func (s *endpointService) Shutdown() {
+	s.healthCheckAgentRepo.StopAll()
+
+	endpoints, err := s.endpointRepo.FetchAll()
+	if err != nil {
+		log.Println("failed to fetch all endpoints, err:", err.Error())
+		return
+	}
+
+	for i := range endpoints {
+		if endpoints[i].ActiveCheck {
+			s.endpointRepo.UpdateCheckActivation(endpoints[i].ID, false)
+		}
+	}
+}
+
 func (s *endpointService) bootstrap() error {
 	models, err := s.FetchAllEndpoints()
 	if err != nil {
@@ -177,6 +194,7 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 		for {
 			select {
 			case <-ctx.Done():
+				log.Println(endpoint.URL, "health check agent is shutting down")
 				return
 			case <-time.After(time.Duration(endpoint.Interval) * time.Second):
 				err := healthCheck(endpoint.URL)

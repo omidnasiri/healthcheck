@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config) (*api.ControllerContainer, error) {
+func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config, closeFunctions map[string]func()) (*api.ControllerContainer, error) {
 
 	// Repositories
 	endpointRepo := repository.NewEndpointRepository(db)
@@ -23,6 +23,7 @@ func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config) (*api.Controlle
 	if err != nil {
 		return nil, err
 	}
+	closeFunctions["endpointService"] = func() { endpointService.Shutdown() }
 
 	// Controllers
 	endpointController := controllerV1.NewEndpointController(endpointService)

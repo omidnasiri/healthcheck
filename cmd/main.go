@@ -26,13 +26,13 @@ func main() {
 	}
 
 	// boot
-	closeFunctions, err := boot.Up(conf)
+	closeFunctions, wg, err := boot.Up(conf)
 	if err != nil {
 		log.Println("could not boot", "err", err.Error())
 	}
 
 	// shutdown
-	boot.Down(closeFunctions)
+	boot.Down(closeFunctions, wg)
 	log.Println("shutdown completed")
 }
 

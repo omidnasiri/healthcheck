@@ -17,6 +17,7 @@ type HealthCheckAgentRepository interface {
 	Delete(id uint) error
 	Start(id uint, wg *sync.WaitGroup) error
 	Stop(id uint) error
+	StopAll()
 }
 
 type agentInMemoryRepository struct {
@@ -83,4 +84,13 @@ func (r *agentInMemoryRepository) Stop(id uint) error {
 	agent.IsActive = false
 	agent.Cancel()
 	return nil
+}
+
+func (r *agentInMemoryRepository) StopAll() {
+	for _, agent := range r.agents {
+		if agent.IsActive {
+			agent.IsActive = false
+			agent.Cancel()
+		}
+	}
 }
