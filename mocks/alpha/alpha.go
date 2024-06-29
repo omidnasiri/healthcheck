@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	http.HandleFunc("/alpha", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("GET /alpha", func(w http.ResponseWriter, r *http.Request) {
 		chance := rand.Intn(100)
 		var status int
 		if chance > 50 {

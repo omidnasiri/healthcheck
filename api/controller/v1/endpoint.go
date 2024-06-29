@@ -29,7 +29,7 @@ func (c *EndpointController) CreateEndpoint(ctx *gin.Context) {
 			Key   string `json:"key"`
 			Value string `json:"value"`
 		} `json:"http_request_headers"`
-		HTTPRequestBody string `json:"http_request_body"`
+		HTTPRequestBody any `json:"http_request_body"`
 	}{}
 	err := ctx.ShouldBindJSON(&req)
 	if err != nil {
@@ -43,7 +43,13 @@ func (c *EndpointController) CreateEndpoint(ctx *gin.Context) {
 		return
 	}
 
-	err = c.endpointService.CreateEndpoint(req.URL, req.HTTPMethod, string(headers), req.HTTPRequestBody, req.Interval, req.Retries)
+	body, err := json.Marshal(req.HTTPRequestBody)
+	if err != nil {
+		presenter.Failure(ctx, http.StatusBadRequest, err)
+		return
+	}
+
+	err = c.endpointService.CreateEndpoint(req.URL, req.HTTPMethod, string(headers), string(body), req.Interval, req.Retries)
 	if err != nil {
 		// ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		presenter.Failure(ctx, http.StatusBadRequest, err)

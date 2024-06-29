@@ -13,7 +13,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"url\": \"http://localhost:8081/beta\",\n    \"interval\": 5,\n    \"retries\": 3\n}",
+					"raw": "{\n    \"url\": \"http://localhost:8081/beta\",\n    \"interval\": 5,\n    \"retries\": 3,\n    \"http_method\": \"POST\",\n    \"http_request_body\": {\n        \"ping\": \"ping\"\n    },\n    \"http_request_headers\": [\n        {\n            \"key\": \"Content-Type\",\n            \"value\": \"application/json\"\n        }\n    ]\n}",
 					"options": {
 						"raw": {
 							"language": "json"

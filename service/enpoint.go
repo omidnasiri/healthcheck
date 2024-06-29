@@ -126,17 +126,17 @@ func (s *endpointService) DeleteEndpoint(id uint) error {
 func (s *endpointService) Shutdown() {
 	s.healthCheckAgentRepo.StopAll()
 
-	endpoints, err := s.endpointRepo.FetchAll()
-	if err != nil {
-		log.Println("failed to fetch all endpoints, err:", err.Error())
-		return
-	}
+	// endpoints, err := s.endpointRepo.FetchAll()
+	// if err != nil {
+	// 	log.Println("failed to fetch all endpoints, err:", err.Error())
+	// 	return
+	// }
 
-	for i := range endpoints {
-		if endpoints[i].ActiveCheck {
-			s.endpointRepo.UpdateCheckActivation(endpoints[i].ID, false)
-		}
-	}
+	// for i := range endpoints {
+	// 	if endpoints[i].ActiveCheck {
+	// 		s.endpointRepo.UpdateCheckActivation(endpoints[i].ID, false)
+	// 	}
+	// }
 }
 
 func (s *endpointService) bootstrap() error {
@@ -173,14 +173,13 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 			string(endpoint.HTTPMethod),
 			endpoint.URL,
 			[]byte(endpoint.HTTPRequestBody),
-			time.Duration(endpoint.Interval),
+			time.Duration(endpoint.Interval)*time.Second,
 			endpoint.Headers,
 		)
+		s.checkLogRepo.Create(endpoint.ID, respStatusCode, string(body))
 		if err != nil {
 			return err
 		}
-
-		s.checkLogRepo.Create(endpoint.ID, respStatusCode, string(body))
 
 		if respStatusCode != http.StatusOK {
 			return errors.New("unhealthy")

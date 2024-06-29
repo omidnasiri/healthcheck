@@ -18,7 +18,7 @@ func main() {
 		err := decoder.Decode(&payload)
 		if err != nil {
 			log.Println(err)
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
