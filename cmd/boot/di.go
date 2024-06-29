@@ -15,10 +15,11 @@ func Inject(db *gorm.DB, wg *sync.WaitGroup, cfg *config.Config) (*api.Controlle
 
 	// Repositories
 	endpointRepo := repository.NewEndpointRepository(db)
+	checkLogRepo := repository.NewCheckLogRepository(db)
 	healthCheckAgentRepo := repository.NewAgentInMemoryRepository()
 
 	// Services
-	endpointService, err := service.NewEndpointService(cfg.WebhookURL, wg, endpointRepo, healthCheckAgentRepo)
+	endpointService, err := service.NewEndpointService(cfg.WebhookURL, wg, checkLogRepo, endpointRepo, healthCheckAgentRepo)
 	if err != nil {
 		return nil, err
 	}

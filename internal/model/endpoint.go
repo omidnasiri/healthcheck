@@ -9,4 +9,5 @@ type Endpoint struct {
 	Retries     int // retries before submitting failure
 	LastStatus  bool
 	ActiveCheck bool
+	CheckLogs   []CheckLog
 }

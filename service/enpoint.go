@@ -25,16 +25,18 @@ type endpointService struct {
 	webhookURL           string
 	wg                   *sync.WaitGroup
 	endpointRepo         repository.EndpointRepository
+	checkLogRepo         repository.CheckLogRepository
 	healthCheckAgentRepo repository.HealthCheckAgentRepository
 }
 
 func NewEndpointService(
 	webhookURL string,
 	wg *sync.WaitGroup,
+	checkLogRepo repository.CheckLogRepository,
 	endpointRepo repository.EndpointRepository,
 	healthCheckAgentRepo repository.HealthCheckAgentRepository,
 ) (EndpointService, error) {
-	endpointService := &endpointService{webhookURL, wg, endpointRepo, healthCheckAgentRepo}
+	endpointService := &endpointService{webhookURL, wg, endpointRepo, checkLogRepo, healthCheckAgentRepo}
 	if err := endpointService.bootstrap(); err != nil {
 		log.Println("failed to bootstrap endpoint service, err:", err.Error())
 		return nil, err
@@ -179,6 +181,7 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 			case <-time.After(time.Duration(endpoint.Interval) * time.Second):
 				err := healthCheck(endpoint.URL)
 				if err != nil {
+					s.checkLogRepo.Create(endpoint.ID, false)
 					tries++
 					log.Println(endpoint.URL, "health check failed, try ", tries, ", err:", err.Error())
 					if tries >= endpoint.Retries {
@@ -190,6 +193,7 @@ func (s *endpointService) agentFactory() model.HealthCheckAgentFunctionSignature
 					}
 					continue
 				}
+				s.checkLogRepo.Create(endpoint.ID, false)
 				tries = 0
 				if !endpoint.LastStatus {
 					updateStatus(endpoint, true)

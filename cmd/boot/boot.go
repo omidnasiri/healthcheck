@@ -24,7 +24,7 @@ func Up(cfg *config.Config) (map[string]func(), error) {
 	}
 	closeFunctions["db"] = func() { postgres.Disconnect(db) }
 
-	if err := db.AutoMigrate(&model.Endpoint{}); err != nil {
+	if err := db.AutoMigrate(&model.Endpoint{}, &model.CheckLog{}); err != nil {
 		log.Println("db migration failed, err:", err.Error())
 		return closeFunctions, err
 	}

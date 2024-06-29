@@ -19,13 +19,13 @@ FROM alpine:edge
 
 # Set the working directory
 WORKDIR /app
-RUN apk update && apk add iputils
 
 # Copy the binary from the build stage
 COPY --from=build /app/healthcheck .
 
 # Set Necessary Environment Variables needed for the application
-ENV POSTGRES_HOST=localhost
+ENV APP_ENV=test
+ENV POSTGRES_HOST=host.docker.internal
 ENV POSTGRES_PORT=5432
 ENV POSTGRES_USER=postgres
 ENV POSTGRES_PASSWORD=mysecretpassword
